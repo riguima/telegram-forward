@@ -5,6 +5,9 @@ from pyrogram.client import Client
 from pyrogram import filters
 from pyrogram.types import Message
 
+from forward_telegram_bot.common import is_valid_phone_number
+from forward_telegram_bot.models import Forward, User
+
 
 def create_app() -> Client:
     load_dotenv()
@@ -27,4 +30,8 @@ def create_app() -> Client:
                 '[id do redirecionamento] - Para remover um redirecionamento'
             )
         )
+
+    @app.on_message(filters.command('logar'))
+    async def login(client: Client, message: Message) -> None:
+        
     return app
