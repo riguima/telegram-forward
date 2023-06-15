@@ -88,6 +88,7 @@ def create_apps() -> list[Client]:
             apps[message.chat.username] = user
             session.add(User(name=message.chat.username))
             session.commit()
+            os.system('systemctl restart forward-telegram-bot')
             await message.reply('Login realizado com sucesso')
         else:
             await message.reply(
@@ -106,16 +107,13 @@ def create_apps() -> list[Client]:
                     '/adicionar 12345678 12345679'
                 )
             )
-        if '"' in message.text:
-            from_chat, to_chat = message.text.split(' "')[1:3]
-        else:
-            from_chat, to_chat = message.text.split()[1:3]
+        from_chat, to_chat = message.text.split()[1:3]
         query = select(User).where(User.name == message.chat.username)
         user = session.scalars(query).first()
         if user:
             forward = Forward(
-                from_chat=from_chat.replace('"', ''),
-                to_chat=to_chat.replace('"', ''),
+                from_chat=from_chat,
+                to_chat=to_chat,
                 user=user,
             )
             session.add(forward)
@@ -128,13 +126,7 @@ def create_apps() -> list[Client]:
                 )
             )
         user_app = apps[message.chat.username]
-        try:
-            await user_app.restart()
-        except ConnectionError:
-            await user_app.start()
-        query = select(Forward).where(Forward.user == user)
-        for forward in session.scalars(query).all():
-            add_forward_to_app(forward, user_app)
+        add_forward_to_app(forward, user_app)
         await message.reply('Redirecionamento adicionado')
 
     @app.on_message(filters.command('listar'))

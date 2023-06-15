@@ -1,6 +1,6 @@
-from pyrogram import filters, idle
-from pyrogram.client import Client
-from pyrogram.types import Message
+import asyncio
+
+from pyrogram import idle
 from sqlalchemy import select
 
 from forward_telegram_bot.app import add_forward_to_app, create_apps
