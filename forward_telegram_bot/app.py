@@ -85,6 +85,11 @@ def create_apps() -> list[Client]:
                     sent_code.phone_code_hash,
                     str(code.text)[2:],
                 )
+            apps[message.chat.username] = Client(
+                message.chat.username,
+                api_id=os.environ['API_ID'],
+                api_hash=os.environ['API_HASH'],
+            )
             session.add(User(name=message.chat.username))
             session.commit()
             await message.reply('Login realizado com sucesso')
@@ -105,12 +110,18 @@ def create_apps() -> list[Client]:
                     '/adicionar 12345678 12345679'
                 )
             )
-        from_chat, to_chat = message.text.split()[1:3]
+        if '"' in message.text:
+            from_chat, to_chat = message.text.split(' "')[1:3]
+        else:
+            from_chat, to_chat = message.text.split()[1:3]
+        print(from_chat, to_chat)
         query = select(User).where(User.name == message.chat.username)
         user = session.scalars(query).first()
         if user:
             forward = Forward(
-                from_chat=from_chat, to_chat=to_chat, user=user
+                from_chat=from_chat.replace('"', ''),
+                to_chat=to_chat.replace('"', ''),
+                user=user,
             )
             session.add(forward)
             session.commit()
@@ -121,13 +132,8 @@ def create_apps() -> list[Client]:
                     'redirecionamento'
                 )
             )
-
         user_app = apps[message.chat.username]
-
-        @user_app.on_message(filters.chat(forward.from_chat))
-        async def forward_message(client: Client, message: Message) -> None:
-            await client.send_message(forward.to_chat, message.text)
-
+        add_forward_to_app(forward, user_app)
         await message.reply('Redirecionamento adicionado')
 
     @app.on_message(filters.command('listar'))
@@ -164,8 +170,19 @@ def create_apps() -> list[Client]:
         query = select(Forward).where(Forward.user == user)
         forwards = session.scalars(query).all()
         for forward in forwards:
-            @user_app.on_message(filters.chat(forward.from_chat))
-            async def forward_message(client: Client, message: Message) -> None:
-                await client.send_message(forward.to_chat, message.text)
+            add_forward_to_app(forward, user_app)
 
     return [app, *list(apps.values())]
+
+
+def add_forward_to_app(forward: Forward, user_app: Client) -> None:
+    from_chat = forward.from_chat
+    if from_chat.isdigit():
+        from_chat = int(from_chat)
+    to_chat = forward.to_chat
+    if to_chat.isdigit():
+        to_chat = int(to_chat)
+
+    @user_app.on_message(filters.chat(from_chat))
+    async def forward_message(client: Client, message: Message) -> None:
+        await client.send_message(to_chat, message.text)
