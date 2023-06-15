@@ -110,7 +110,6 @@ def create_apps() -> list[Client]:
             from_chat, to_chat = message.text.split(' "')[1:3]
         else:
             from_chat, to_chat = message.text.split()[1:3]
-        print(from_chat, to_chat)
         query = select(User).where(User.name == message.chat.username)
         user = session.scalars(query).first()
         if user:
@@ -129,7 +128,13 @@ def create_apps() -> list[Client]:
                 )
             )
         user_app = apps[message.chat.username]
-        add_forward_to_app(forward, user_app)
+        try:
+            await user_app.restart()
+        except ConnectionError:
+            await user_app.start()
+        query = select(Forward).where(Forward.user == user)
+        for forward in session.scalars(query).all():
+            add_forward_to_app(forward, user_app)
         await message.reply('Redirecionamento adicionado')
 
     @app.on_message(filters.command('listar'))

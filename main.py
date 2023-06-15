@@ -12,7 +12,7 @@ if __name__ == '__main__':
     apps = create_apps()
     for e, app in enumerate(apps):
         app.start()
-        if e == 0:
+        if e != 0:
             for user in session.scalars(select(User)).all():
                 query = select(Forward).where(Forward.user == user)
                 for forward in session.scalars(query).all():
