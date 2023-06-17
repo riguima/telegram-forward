@@ -5,7 +5,7 @@ from pyrogram.client import Client
 from pyrogram import filters
 from pyrogram.errors import SessionPasswordNeeded
 from pyrogram.types import Message
-from pyromod import listen
+from pyrogram.handlers import MessageHandler
 from sqlalchemy import select
 
 from forward_telegram_bot.common import is_valid_phone_number
@@ -60,36 +60,27 @@ def create_apps() -> list[Client]:
             )
             await user.connect()
             sent_code = await user.send_code(phone_number)
-            code = await message.chat.ask(
+            await message.reply(
                 (
                     'Digite o código de verificação, digite nesse padrão '
                     '(aacodigo): '
                 )
             )
-            try:
-                await user.sign_in(
-                    phone_number,
-                    sent_code.phone_code_hash,
-                    str(code.text)[2:],
-                )
-            except SessionPasswordNeeded:
-                password = await message.chat.ask(
-                    (
-                        'Digite sua senha de verificação de duas etapas, '
-                        'digite nesse formato (aasenha)'
+
+            @app.on_message()
+            async def sign_in(client: Client, message: Message) -> None:
+                if message.text[:2] == 'aa':
+                    await user.sign_in(
+                        phone_number,
+                        sent_code.phone_code_hash,
+                        message.text[2:],
                     )
-                )
-                user.password = str(password.text)[2:]
-                await user.sign_in(
-                    phone_number,
-                    sent_code.phone_code_hash,
-                    str(code.text)[2:],
-                )
-            apps[message.chat.username] = user
-            session.add(User(name=message.chat.username))
-            session.commit()
-            os.system('systemctl restart forward-telegram-bot')
-            await message.reply('Login realizado com sucesso')
+                    apps[message.chat.username] = user
+                    session.add(User(name=message.chat.username))
+                    session.commit()
+                    os.system('systemctl restart forward-telegram-bot')
+                    await message.reply('Login realizado com sucesso')
+
         else:
             await message.reply(
                 (
@@ -170,12 +161,16 @@ def create_apps() -> list[Client]:
 
 def add_forward_to_app(forward: Forward, user_app: Client) -> None:
     from_chat = forward.from_chat
-    if from_chat.isdigit():
+    try:
         from_chat = int(from_chat)
+    except ValueError:
+        pass
     to_chat = forward.to_chat
-    if to_chat.isdigit():
+    try:
         to_chat = int(to_chat)
+    except ValueError:
+        pass
 
     @user_app.on_message(filters.chat(from_chat))
     async def forward_message(client: Client, message: Message) -> None:
-        await client.send_message(to_chat, message.text)
+        await message.forward(to_chat)
